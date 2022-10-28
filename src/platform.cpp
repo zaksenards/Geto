@@ -3,19 +3,28 @@
 #include <winerror.h>
 #include <windows.h>
 #include <cstdlib>
+#include <cassert>
 #include <cstdio>
+#include <cmath>
+#include <map>
 
 #ifdef DEBUG_BUILD
-#define printerr(msg) fprintf(stderr, msg)
-#define printlog(msg) fprintf(stdout, msg)
+    #define logerr(msg) fprintf(stderr, msg)
+    #define loginfo(msg) fprintf(stdout, msg)
 #endif
 
 #define GETO_CLASS_NAME "GETO_WINDOWING_CLASS"
 constexpr int GETO_CLOSE_EVENT = WM_USER+1;
 constexpr int GETO_KEYBOARD_EVENT = WM_USER+2;
+constexpr int GETO_WINDOW_SIZE = WM_USER+3;
+
+// void* to window
+std::map<HWND, void*> handleToWindow;
 
 LRESULT windowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 {
+
+
     switch(uMsg)
     {
         case WM_CLOSE:
@@ -27,15 +36,22 @@ LRESULT windowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
                 PostMessageA(hWnd, GETO_KEYBOARD_EVENT, wParam, lParam);
                 break;
             }
-
         default:
             return DefWindowProcA(hWnd, uMsg, wParam, lParam);
     }
+
     return 0;
 }
 
 namespace geto
 {
+    enum CallbackType:short
+     {
+         WINDOW_RESIZE,
+         WINDOW_UPDATE,
+         WINDOW_CLOSE
+     };
+
     struct Window
     {
         int width;
@@ -44,6 +60,7 @@ namespace geto
         HWND handle;
         HDC msContext;
         bool shouldClose;
+        void* callbacks[MAX_CALLBACKS];
         char keyEvent[MAX_KEYBOARD_KEYS]; 
     };
 
@@ -58,13 +75,15 @@ namespace geto
 
     int platform::init()
     {
+        //TODO: Check if it's already initialized
+        
         HINSTANCE hInstance = GetModuleHandle(NULL);
         WNDCLASSEXA wc = {};
 
-        printlog("[*] Trying to load window class...\n");
+        loginfo("[*] Trying to load window class...\n");
         if(!GetClassInfoExA(hInstance, GETO_CLASS_NAME, &wc))
         {
-            printlog("[*] [!] existent class not found. Creating a new one\n");
+            loginfo("[*] Existent class not found. Creating a new one\n");
             wc.hbrBackground = (HBRUSH)GetStockObject(BLACK_BRUSH);
             wc.lpszClassName = GETO_CLASS_NAME;
             wc.cbSize = sizeof(WNDCLASSEX);
@@ -78,7 +97,7 @@ namespace geto
 
                 char msg[80];
                 sprintf(msg, "[!] Can't register window class. Error code: %d\n",error);
-                printerr(msg);
+                logerr(msg);
                 return false;
             }
         }
@@ -96,7 +115,7 @@ namespace geto
     {
         char msg[80];
         sprintf(msg,"[*] Creating window {w:%d,h:%d,t:%s}",width,height,title);
-        printlog(msg);
+        loginfo(msg);
 
         HWND hwnd = CreateWindowExA(
                 0,
@@ -113,7 +132,7 @@ namespace geto
         {
             DWORD errorCode = GetLastError();
             sprintf(msg, "Can't create window. error code: %d\n",errorCode);
-            printerr(msg);
+            logerr(msg);
         }
         ShowWindow(hwnd, SW_SHOW);
 
@@ -124,6 +143,7 @@ namespace geto
         window->tilte = (char*)title;
         window->msContext = GetDC(hwnd);
         window->shouldClose = false;
+        handleToWindow[hwnd] = window;
         return window;
     }
 
@@ -148,6 +168,9 @@ namespace geto
         for(int i = 0; i < MAX_KEYBOARD_KEYS;i++)
             window->keyEvent[i] &= ~(1 << 0);
 
+
+        assert(true);
+
         while(PeekMessageA(&msg, NULL, 0, 0, PM_REMOVE))
         {
             switch(msg.message)
@@ -170,6 +193,22 @@ namespace geto
                     break;
             }
 
+            // Calculates window size
+            WINDOWINFO wndInfo = {};
+            wndInfo.cbSize = sizeof(WINDOWINFO);
+            GetWindowInfo(window->handle, &wndInfo);
+            RECT rect = wndInfo.rcWindow;
+            int width = (int) abs((rect.left - rect.right));
+            int height = (int) abs((rect.top - rect.bottom));
+
+            if(width != window->width || height != window->height)
+            {
+                Callbacks::ResizeCallback cbk = (Callbacks::ResizeCallback) window->callbacks[CallbackType::WINDOW_RESIZE];
+                window->width = width;
+                window->height = height;
+                cbk(width,height);
+            }
+
             TranslateMessage(&msg);
             DispatchMessage(&msg);
         }
@@ -178,5 +217,14 @@ namespace geto
     bool platform::keyDown(char keyCode, Window* window)
     {
         return !window->keyEvent[keyCode] & (1 << 0); 
+    }
+
+    bool platform::addResizeCallback(Window* window, Callbacks::ResizeCallback cbk)
+    {
+        if(!cbk)
+            return false;
+
+        window->callbacks[CallbackType::WINDOW_RESIZE] = cbk;
+        return true;
     }
 }

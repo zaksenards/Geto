@@ -16,6 +16,8 @@ add_compile_definitions(Geto PRIVATE DEBUG_BUILD)
 add_compile_definitions(-Wall -Werror)
 
 add_executable(simpleWindow ${GETO_EXEMPLE_SOURCES_PATH}/simpleWindow.cpp)
+add_executable(callbacks ${GETO_EXEMPLE_SOURCES_PATH}/callback.cpp)
 add_executable(keyboard ${GETO_EXEMPLE_SOURCES_PATH}/keyboard.cpp)
 target_link_libraries(simpleWindow Geto)
+target_link_libraries(callbacks Geto)
 target_link_libraries(keyboard Geto)
