@@ -23,8 +23,6 @@ std::map<HWND, void*> handleToWindow;
 
 LRESULT windowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 {
-
-
     switch(uMsg)
     {
         case WM_CLOSE:
@@ -45,18 +43,11 @@ LRESULT windowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 
 namespace geto
 {
-    enum CallbackType:short
-     {
-         WINDOW_RESIZE,
-         WINDOW_UPDATE,
-         WINDOW_CLOSE
-     };
-
     struct Window
     {
         int width;
         int height;
-        char* tilte;
+        char* title;
         HWND handle;
         HDC msContext;
         bool shouldClose;
@@ -98,6 +89,7 @@ namespace geto
                 char msg[80];
                 sprintf(msg, "[!] Can't register window class. Error code: %d\n",error);
                 logerr(msg);
+                platform::stop();
                 return false;
             }
         }
@@ -108,13 +100,20 @@ namespace geto
 
     void platform::stop()
     {
-
+        printf("[*] Calling stop\n");
+        WNDCLASSEXA wc = {};
+        if(GetClassInfoExA(shared::hInstance, GETO_CLASS_NAME, &wc))
+        {
+            UnregisterClassA(GETO_CLASS_NAME, shared::hInstance);
+        }
+        if(shared::hInstance)
+            FreeLibrary(shared::hInstance);
     }
 
     Window* platform::createWindow(const int width, const int height, const char* title)
     {
         char msg[80];
-        sprintf(msg,"[*] Creating window {w:%d,h:%d,t:%s}",width,height,title);
+        sprintf(msg,"[*] Creating window {w:%d,h:%d,t:%s}\n",width,height,title);
         loginfo(msg);
 
         HWND hwnd = CreateWindowExA(
@@ -131,7 +130,7 @@ namespace geto
         if(!hwnd)
         {
             DWORD errorCode = GetLastError();
-            sprintf(msg, "Can't create window. error code: %d\n",errorCode);
+            sprintf(msg, "[!] Can't create window. error code: %d\n",errorCode);
             logerr(msg);
         }
         ShowWindow(hwnd, SW_SHOW);
@@ -140,10 +139,14 @@ namespace geto
         window->width = width;
         window->handle = hwnd;
         window->height = height;
-        window->tilte = (char*)title;
+        window->title = (char*)title;
         window->msContext = GetDC(hwnd);
         window->shouldClose = false;
+        window->callbacks[Callbacks::WINDOW_CLOSE] = nullptr;
+        window->callbacks[Callbacks::WINDOW_RESIZE] = nullptr;
+        window->callbacks[Callbacks::WINDOW_UPDATE] = nullptr;
         handleToWindow[hwnd] = window;
+
         return window;
     }
 
@@ -151,6 +154,10 @@ namespace geto
     {
         if(window)
         {
+            Callbacks::CloseCallback cbk = (Callbacks::CloseCallback) window->callbacks[Callbacks::WINDOW_CLOSE];
+            if(cbk != nullptr)
+                cbk(window->title);
+
             DestroyWindow(window->handle);
             DeleteDC(window->msContext);
         }
@@ -203,7 +210,7 @@ namespace geto
 
             if(width != window->width || height != window->height)
             {
-                Callbacks::ResizeCallback cbk = (Callbacks::ResizeCallback) window->callbacks[CallbackType::WINDOW_RESIZE];
+                Callbacks::ResizeCallback cbk = (Callbacks::ResizeCallback) window->callbacks[Callbacks::WINDOW_RESIZE];
                 window->width = width;
                 window->height = height;
                 cbk(width,height);
@@ -219,12 +226,11 @@ namespace geto
         return !window->keyEvent[keyCode] & (1 << 0); 
     }
 
-    bool platform::addResizeCallback(Window* window, Callbacks::ResizeCallback cbk)
+    bool platform::addCallback(Window* window, void* callback, int type)
     {
-        if(!cbk)
+        if(!callback)
             return false;
-
-        window->callbacks[CallbackType::WINDOW_RESIZE] = cbk;
+        window->callbacks[type] = callback;
         return true;
     }
 }
