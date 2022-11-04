@@ -21,13 +21,6 @@ namespace geto
 
     struct Callbacks
     {
-        enum 
-        {
-            WINDOW_RESIZE = 0,
-            WINDOW_UPDATE = 1,
-            WINDOW_CLOSE = 2
-        };
-
         // Called when resize action performed
         typedef void (*ResizeCallback)(int nx, int ny); 
 
@@ -35,7 +28,7 @@ namespace geto
         typedef void (*UpdateCallback)(float dt);
 
         // Called when user request for window to close
-        typedef void (*CloseCallback)(const char* title);
+        typedef void (*CloseCallback)();
     };
 
     struct GETOAPI platform
@@ -47,7 +40,7 @@ namespace geto
         static void destroyWindow(Window* window);
         
         static bool shouldClose(const Window* window);
-        static bool addCallback(Window* window, void* callback, int type);
+        static bool addResizeCallback(Window* window, Callbacks::ResizeCallback cbk);
 
         static bool keyDown(char keyCode, Window* window);
         static void updateEvents(Window* window);

@@ -6,7 +6,6 @@
 using namespace geto;
 
 void onResize(int x, int y);
-void onClose(const char* title);
 
 int main(int argc, char* argv[])
 {
@@ -15,9 +14,7 @@ int main(int argc, char* argv[])
 
     Window* window = platform::createWindow(800,600,"Geto Window");
 
-    platform::addCallback(window, onResize, Callbacks::WINDOW_RESIZE);
-    platform::addCallback(window, onClose, Callbacks::WINDOW_CLOSE);
-
+    platform::addResizeCallback(window, onResize);
     while(!platform::shouldClose(window) & !platform::keyDown(VK_ESCAPE, window))
         platform::updateEvents(window);
 
@@ -28,10 +25,5 @@ int main(int argc, char* argv[])
 
 void onResize(int x, int y)
 {
-    printf("\n[*] New window size is %d x %d\n",x,y);
-}
-
-void onClose(const char* title)
-{
-    printf("Window window %s was closed\n",title);
+    printf("\nNew window size is %d x %d\n",x,y);
 }
