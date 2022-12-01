@@ -7,7 +7,7 @@ A Window system for windows writen in c++
 - [ ] Implement callback functions  
     - [X] Implement Close Callback  
     - [X] Implement Resize Callback  
-    - [ ] Implement Minimize/Maximize Callback  
+    - [X] Implement Minimize/Maximize Callback  
 - [ ] Support OpenGL context initialization  
     - [ ] Implement OpenGL Legacy context  
     - [ ] Implement OpenGL Core context  
