@@ -4,7 +4,7 @@
 #ifndef GETO_PLATFORM_H
 #define GETO_PLATFORM_H
 
-#define MAX_CALLBACKS 3
+#define MAX_CALLBACKS 5
 #define PLATFORM_WINDOWS
 #ifdef PLATFORM_WINDOWS
     #include <windows.h>
@@ -25,17 +25,22 @@ namespace geto
         {
             WINDOW_RESIZE = 0,
             WINDOW_UPDATE = 1,
-            WINDOW_CLOSE = 2
+            WINDOW_CLOSE = 2,
+            WINDOW_MINIMIZE = 3,
+            WINDOW_MAXIMIZE = 4
         };
 
         // Called when resize action performed
-        typedef void (*ResizeCallback)(int nx, int ny); 
+        typedef void (*ResizeCallback)(int nx, int ny);
 
         // Called after window updates
         typedef void (*UpdateCallback)(float dt);
 
         // Called when user request for window to close
         typedef void (*CloseCallback)(const char* title);
+
+        typedef void (*MinimizeCallback)();
+        typedef void (*MaximizeCallback)();
     };
 
     struct GETOAPI platform
@@ -51,6 +56,7 @@ namespace geto
 
         static bool keyDown(char keyCode, Window* window);
         static void updateEvents(Window* window);
+
     };
 }
 

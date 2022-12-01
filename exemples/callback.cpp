@@ -7,6 +7,8 @@ using namespace geto;
 
 void onResize(int x, int y);
 void onClose(const char* title);
+void onMinimize();
+void onMaximize();
 
 int main(int argc, char* argv[])
 {
@@ -17,7 +19,8 @@ int main(int argc, char* argv[])
 
     platform::addCallback(window, onResize, Callbacks::WINDOW_RESIZE);
     platform::addCallback(window, onClose, Callbacks::WINDOW_CLOSE);
-
+    platform::addCallback(window, onMinimize, Callbacks::WINDOW_MINIMIZE);
+    platform::addCallback(window, onMaximize, Callbacks::WINDOW_MAXIMIZE);
 
     while(!platform::shouldClose(window) & !platform::keyDown(VK_ESCAPE, window))
         platform::updateEvents(window);
@@ -35,4 +38,14 @@ void onResize(int x, int y)
 void onClose(const char* title)
 {
     printf("Window %s was closed\n",title);
+}
+
+void onMinimize()
+{
+    printf("Window minimized\n");
+}
+
+void onMaximize()
+{
+    printf("Window Maximinized\n");
 }

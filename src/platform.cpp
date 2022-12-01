@@ -4,22 +4,18 @@
 #include <windows.h>
 #include <cstdlib>
 #include <cassert>
+#include <cstdint>
 #include <cstdio>
 #include <cmath>
-#include <map>
-
-#ifdef DEBUG_BUILD
-    #define logerr(msg) fprintf(stderr, msg)
-    #define loginfo(msg) fprintf(stdout, msg)
-#endif
+//#include <map>
 
 #define GETO_CLASS_NAME "GETO_WINDOWING_CLASS"
 constexpr int GETO_CLOSE_EVENT = WM_USER+1;
 constexpr int GETO_KEYBOARD_EVENT = WM_USER+2;
-constexpr int GETO_WINDOW_SIZE = WM_USER+3;
+constexpr int GETO_RESIZE_EVENT = WM_USER+3;
 
-// void* to window
-std::map<HWND, void*> handleToWindow;
+const int windowMinimized_width = 160;
+const int windowMinimized_height = 28;
 
 LRESULT windowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 {
@@ -34,6 +30,9 @@ LRESULT windowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
                 PostMessageA(hWnd, GETO_KEYBOARD_EVENT, wParam, lParam);
                 break;
             }
+        case WM_SIZE:
+            PostMessageA(hWnd, GETO_RESIZE_EVENT, wParam, lParam);
+            break;
         default:
             return DefWindowProcA(hWnd, uMsg, wParam, lParam);
     }
@@ -43,6 +42,7 @@ LRESULT windowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 
 namespace geto
 {
+
     struct Window
     {
         int width;
@@ -51,6 +51,7 @@ namespace geto
         HWND handle;
         HDC msContext;
         bool shouldClose;
+        bool isMinimized;
         void* callbacks[MAX_CALLBACKS];
         char keyEvent[MAX_KEYBOARD_KEYS]; 
     };
@@ -71,10 +72,10 @@ namespace geto
         HINSTANCE hInstance = GetModuleHandle(NULL);
         WNDCLASSEXA wc = {};
 
-        loginfo("[*] Trying to load window class...\n");
+        printf("[*] Trying to load window class...\n");
         if(!GetClassInfoExA(hInstance, GETO_CLASS_NAME, &wc))
         {
-            loginfo("[*] Existent class not found. Creating a new one\n");
+            printf("[*] Existent class not found. Creating a new one\n");
             wc.hbrBackground = (HBRUSH)GetStockObject(BLACK_BRUSH);
             wc.lpszClassName = GETO_CLASS_NAME;
             wc.cbSize = sizeof(WNDCLASSEX);
@@ -88,7 +89,7 @@ namespace geto
 
                 char msg[80];
                 sprintf(msg, "[!] Can't register window class. Error code: %d\n",error);
-                logerr(msg);
+                fprintf(stderr, msg);
                 platform::stop();
                 return false;
             }
@@ -114,7 +115,7 @@ namespace geto
     {
         char msg[80];
         sprintf(msg,"[*] Creating window {w:%d,h:%d,t:%s}\n",width,height,title);
-        loginfo(msg);
+        printf(msg);
 
         HWND hwnd = CreateWindowExA(
                 0,
@@ -131,8 +132,9 @@ namespace geto
         {
             DWORD errorCode = GetLastError();
             sprintf(msg, "[!] Can't create window. error code: %d\n",errorCode);
-            logerr(msg);
         }
+
+        //Isaac(TODO): Let the user choose if window should be visible after it's creation
         ShowWindow(hwnd, SW_SHOW);
 
         Window* window = new Window;
@@ -141,11 +143,9 @@ namespace geto
         window->height = height;
         window->title = (char*)title;
         window->msContext = GetDC(hwnd);
+        window->isMinimized = false;
         window->shouldClose = false;
-        window->callbacks[Callbacks::WINDOW_CLOSE] = nullptr;
-        window->callbacks[Callbacks::WINDOW_RESIZE] = nullptr;
-        window->callbacks[Callbacks::WINDOW_UPDATE] = nullptr;
-        handleToWindow[hwnd] = window;
+        memset(window->callbacks, 0, sizeof(window->callbacks));
 
         return window;
     }
@@ -175,9 +175,6 @@ namespace geto
         for(int i = 0; i < MAX_KEYBOARD_KEYS;i++)
             window->keyEvent[i] &= ~(1 << 0);
 
-
-        assert(true);
-
         while(PeekMessageA(&msg, NULL, 0, 0, PM_REMOVE))
         {
             switch(msg.message)
@@ -197,6 +194,21 @@ namespace geto
                         //printf("KC: %d | ID: %d | WD: %d\n",vkCode, isDown,wasDown);
                         window->keyEvent[vkCode] = keybit;
                     }
+                case GETO_RESIZE_EVENT:
+                    {
+                        if(msg.wParam == SIZE_MINIMIZED)
+                        {
+                            window->isMinimized = true;
+                            Callbacks::MinimizeCallback cbk = (Callbacks::MinimizeCallback) window->callbacks[Callbacks::WINDOW_MINIMIZE];
+                            if(cbk) cbk();
+                        }
+                        else if(msg.wParam == SIZE_RESTORED && window->isMinimized)
+                        {
+                            Callbacks::MaximizeCallback cbk = (Callbacks::MaximizeCallback) window->callbacks[Callbacks::WINDOW_MAXIMIZE];
+                            window->isMinimized = false;
+                            if(cbk) cbk();
+                        }
+                    }
                     break;
             }
 
@@ -213,7 +225,8 @@ namespace geto
                 Callbacks::ResizeCallback cbk = (Callbacks::ResizeCallback) window->callbacks[Callbacks::WINDOW_RESIZE];
                 window->width = width;
                 window->height = height;
-                cbk(width,height);
+                if(cbk)
+                    cbk(width,height);
             }
 
             TranslateMessage(&msg);
