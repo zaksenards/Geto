@@ -4,7 +4,7 @@ A Window system for windows writen in c++
 
 ## TODO
 
-- [ ] Implement callback functions  
+- [X] Implement callback functions  
     - [X] Implement Close Callback  
     - [X] Implement Resize Callback  
     - [X] Implement Minimize/Maximize Callback  
